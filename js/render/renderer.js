@@ -139,7 +139,8 @@ class Renderer {
             { binding: 0, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
             { binding: 1, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } },
             { binding: 2, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
-            { binding: 3, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float', viewDimension } }
+            { binding: 3, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float', viewDimension } },
+            { binding: 4, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'read-only-storage' } }
         ];
         this.groupLayouts = {
             '2d': device.createBindGroupLayout({ entries: layoutEntries('2d') }),
@@ -180,6 +181,13 @@ class Renderer {
         };
     }
 
+    // ---- World materials: the scenario's material table, indexed by the mesh vertices' material id ----
+    setWorldMaterials(table) {
+        this.worldMaterials = table;
+        this.worldMaterialBuffer = this.createBuffer(table.data.byteLength, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST);
+        this.device.queue.writeBuffer(this.worldMaterialBuffer, 0, table.data);
+    }
+
     // ---- GUI materials: a named texture + a shading ----
     registerMaterial(name, shading, textureView) {
         if (!this.shadings[shading]) throw new Error(`Unknown shading "${shading}"`);
@@ -210,7 +218,8 @@ class Renderer {
                 { binding: 0, resource: { buffer: view.buffer } },
                 { binding: 1, resource: { buffer: this.instanceBuffer } },
                 { binding: 2, resource: this.sampler },
-                { binding: 3, resource: mat.view }
+                { binding: 3, resource: mat.view },
+                { binding: 4, resource: { buffer: this.worldMaterialBuffer } }
             ]
         });
         view.groups.set(name, { version: mat.version, group });

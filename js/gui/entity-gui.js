@@ -41,7 +41,7 @@ class EntityGUI {
         this.stencilRef = r.nextStencilRef();
         this.anchorInstance = r.allocInstances(1);
         this.guiInstance = r.allocInstances(1);
-        this.anchorMesh = r.createMesh(new MeshBuilder().surface(this.tri, this.def.anchorMaterial || 'glass'));
+        this.anchorMesh = r.createMesh(new MeshBuilder(r.worldMaterials).surface(this.tri, this.def.anchorMaterial || 'glass'));
         this.model.createBuffer(r);
     }
 

@@ -4,7 +4,7 @@
 //
 // Units are metres; +Y is up and the player starts looking down -Z ("north").
 // Model parts: { box: [x0, y0, z0, x1, y1, z1], mat } | { cylinder: [cx, cy, cz], r, len, axis, mat, seg? }
-// Materials: see MATERIALS in js/render/geometry.js
+// Materials: names from `materials` below (patterns / signals: see js/render/materials.js)
 
 const SCENARIO = (() => {
 const box = (x0, y0, z0, x1, y1, z1, mat) => ({ box: [x0, y0, z0, x1, y1, z1], mat });
@@ -31,6 +31,31 @@ return {
             'MAINT: HATCH B LOCKED - CODE ON FILE',
             'TIP: [TAB] TOGGLES YOUR HANDHELD'
         ]
+    },
+
+    // ---------------------------------------------------------------- materials
+    // { pattern?, args?, albedo, spec?, shin?, emissive?: { color, signal?, base?, gain?, rate?, spread?, duty?, idle? } }
+    // Emission = color * (base + gain * signal); `idle` = level used while the instance isn't selected.
+    materials: {
+        wall:       { pattern: 'panels', albedo: [0.16, 0.17, 0.18], spec: 0.35, shin: 28 },
+        floorGrate: { pattern: 'grating', albedo: [0.24, 0.23, 0.21], spec: 0.7, shin: 40 },
+        copper:     { pattern: 'mottled', albedo: [0.40, 0.24, 0.12], spec: 0.8, shin: 36 },
+        door:       { pattern: 'door', albedo: [0.30, 0.32, 0.34], spec: 0.5, shin: 32 },
+        // Glows with the first light (the lamp)
+        bulb:       { albedo: [0, 0, 0], emissive: { color: [1, 1, 1], signal: 'light0', base: 0.08, gain: 0.5 } },
+        darkMetal:  { pattern: 'plates', albedo: [0.10, 0.11, 0.12], spec: 0.45, shin: 30 },
+        glass:      { albedo: [0.004, 0.012, 0.014], spec: 1.2, shin: 110 },
+        redGlow:    { albedo: [0.05, 0.05, 0.05], emissive: { color: [1, 0.07, 0.02], signal: 'wave', base: 1.1, gain: 0.25, rate: 2.3 } },
+        ceiling:    { pattern: 'tiles', albedo: [0.085, 0.09, 0.095], spec: 0.2, shin: 16 },
+        hazard:     { pattern: 'hazard', albedo: [0.75, 0.55, 0.04], spec: 0.4, shin: 24 },
+        led:        { albedo: [0.02, 0.02, 0.02], emissive: { color: [0.15, 1, 0.35], signal: 'blink', base: 0.3, gain: 1.7, rate: 0.6, spread: 3.7, duty: 0.35 } },
+        lightMetal: { albedo: [0.18, 0.2, 0.16], spec: 0.7, shin: 40 },
+        beacon:     { albedo: [0.08, 0.01, 0.01], emissive: { color: [1, 0.08, 0.03], signal: 'alarm', base: 0.12, gain: 3 } },
+        // Red tally LED: blinks while its camera / drone is selected
+        tally:      { albedo: [0.05, 0, 0], emissive: { color: [1, 0.06, 0.03], signal: 'blink', base: 0.2, gain: 3, rate: 1.5, duty: 0.5, idle: 0.35 } },
+        armour:     { pattern: 'bands', albedo: [0.15, 0.19, 0.12], spec: 0.5, shin: 30 },
+        phoneBody:  { albedo: [0.035, 0.037, 0.042], spec: 0.9, shin: 70, emissive: { color: [0.012, 0.013, 0.015] } },
+        wood:       { pattern: 'wood', albedo: [0.36, 0.23, 0.12], spec: 0.25, shin: 20 }
     },
 
     // ---------------------------------------------------------------- models

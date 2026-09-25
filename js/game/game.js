@@ -44,6 +44,7 @@ class Game {
         await r.init();
         await GuiAtlas.loadFonts();
         await r.createPipelines();
+        r.setWorldMaterials(new MaterialTable(this.scenario.materials));
 
         this.atlas = new GuiAtlas();
         r.registerMaterial('atlas', 'gui', this.atlas.upload(r));

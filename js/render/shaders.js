@@ -1,7 +1,8 @@
 'use strict';
 // WGSL sources.
 
-// Scene + GUI shader. Bind group 0: view uniforms, per-instance data, sampler, material texture.
+// Scene + GUI shader. Bind group 0: view uniforms, per-instance data, sampler, GUI material texture,
+// world material table.
 const SCENE_SHADER = /* wgsl */`
     struct Light { pos : vec4f, color : vec4f };   // pos.w = intensity
     struct Globals {
@@ -16,6 +17,7 @@ const SCENE_SHADER = /* wgsl */`
     @group(0) @binding(1) var<storage, read> inst : array<Instance>;
     @group(0) @binding(2) var guiSampler : sampler;
     @group(0) @binding(3) var guiTex : texture_2d<f32>;
+    @group(0) @binding(4) var<storage, read> mats : array<MaterialDef>;
 
     fn hash(p : vec2f) -> f32 {
         return fract(sin(dot(p, vec2f(127.1, 311.7))) * 43758.5453);
@@ -56,105 +58,97 @@ const SCENE_SHADER = /* wgsl */`
         let f = fract(x);
         return 1.0 - step(w, f) * step(f, 1.0 - w);
     }
-    fn hazard(uv : vec2f) -> vec3f {
-        let st = step(0.5, fract((uv.x + uv.y) * 2.5));
-        return mix(vec3f(0.02), vec3f(0.75, 0.55, 0.04), st);
+    fn hazard(uv : vec2f, stripe : vec3f, freq : f32) -> vec3f {
+        let st = step(0.5, fract((uv.x + uv.y) * freq));
+        return mix(vec3f(0.02), stripe, st);
     }
 
+    // Material table (see MaterialTable in materials.js)
+    struct MaterialDef {
+        albedo : vec4f,     // rgb, w = pattern id
+        emis   : vec4f,     // rgb, w = signal id
+        shade  : vec4f,     // x spec, y shininess, z idle emission (< 0: ignores selection), w blink duty
+        sig    : vec4f,     // x base, y gain, z rate, w uv.x spread
+        args   : vec4f,     // pattern arguments
+    };
     struct Mat { albedo : vec3f, spec : f32, shin : f32, emis : vec3f };
 
-    // Material ids match MATERIALS in geometry.js
-    fn material(id : u32, uv : vec2f, wp : vec3f, sel : f32) -> Mat {
-        let t = U.params.x;
-        var m : Mat;
-        m.albedo = vec3f(0.3);
-        m.spec = 0.3;
-        m.shin = 32.0;
-        m.emis = vec3f(0.0);
+    // Surface detail around the base albedo
+    fn pattern(id : u32, base : vec3f, a : vec4f, uv : vec2f, wp : vec3f, m : ptr<function, Mat>) {
         switch id {
-            case 0u: { // wall panels
+            case 1u: { // wall panels
                 let cell = floor(vec2f(uv.x, uv.y * 0.5));
-                var a = vec3f(0.16, 0.17, 0.18) * (0.75 + 0.5 * hash(cell));
-                a = a * (1.0 - 0.75 * max(seam(uv.x, 0.01), seam(uv.y * 0.5, 0.005)));
+                var c = base * (0.75 + 0.5 * hash(cell));
+                c = c * (1.0 - 0.75 * max(seam(uv.x, 0.01), seam(uv.y * 0.5, 0.005)));
                 let rv = fract(vec2f(uv.x, uv.y * 0.5));
                 let rd = min(min(length(rv - vec2f(0.05, 0.05)), length(rv - vec2f(0.95, 0.05))),
                              min(length(rv - vec2f(0.05, 0.95)), length(rv - vec2f(0.95, 0.95))));
-                if (rd < 0.02) { a = a * 1.8; }
-                if (wp.y < 1.0) { a = a * vec3f(0.7, 0.68, 0.64); }
-                if (abs(wp.y - 1.0) < 0.035) { a = vec3f(0.55, 0.32, 0.08); }
-                m.albedo = a; m.spec = 0.35; m.shin = 28.0;
+                if (rd < 0.02) { c = c * 1.8; }
+                if (wp.y < 1.0) { c = c * vec3f(0.7, 0.68, 0.64); }
+                if (abs(wp.y - 1.0) < 0.035) { c = vec3f(0.55, 0.32, 0.08); }
+                (*m).albedo = c;
             }
-            case 1u: { // floor grating
-                let g = fract(uv * 5.0);
+            case 2u: { // grating
+                let g = fract(uv * a.x);
                 let hole = step(0.18, g.x) * step(0.18, g.y);
-                var a = mix(vec3f(0.24, 0.23, 0.21), vec3f(0.015), hole);
-                a = a * (1.0 - 0.6 * max(seam(uv.x * 0.5, 0.006), seam(uv.y * 0.5, 0.006)));
-                m.albedo = a; m.spec = mix(0.7, 0.02, hole); m.shin = 40.0;
+                (*m).albedo = mix(base, vec3f(0.015), hole) * (1.0 - 0.6 * max(seam(uv.x * 0.5, 0.006), seam(uv.y * 0.5, 0.006)));
+                (*m).spec = mix((*m).spec, a.y, hole);
             }
-            case 2u: { // copper pipes
-                m.albedo = vec3f(0.40, 0.24, 0.12) * (0.75 + 0.35 * hash(floor(uv * vec2f(4.0, 2.0))));
-                m.spec = 0.8; m.shin = 36.0;
+            case 3u: { // mottled
+                (*m).albedo = base * (a.z + a.w * hash(floor(uv * a.xy)));
             }
-            case 3u: { // sliding door
-                var a = vec3f(0.30, 0.32, 0.34) * (1.0 - 0.6 * seam(uv.y * 1.25 + 0.5, 0.012));
-                if (uv.y < -0.95 || uv.y > 1.05) { a = hazard(uv); }
-                m.albedo = a; m.spec = 0.5; m.shin = 32.0;
+            case 4u: { // plates
+                var c = base * (a.y + a.z * hash(floor(uv * a.x)));
+                (*m).albedo = c * (1.0 - a.w * max(seam(uv.x * a.x, 0.01), seam(uv.y * a.x, 0.01)));
             }
-            case 4u: { // lamp bulb: glows with the first light
-                m.albedo = vec3f(0.0);
-                m.emis = U.lights[0].color.rgb * (0.08 + U.lights[0].pos.w * 0.5);
+            case 5u: { // sliding door
+                var c = base * (1.0 - 0.6 * seam(uv.y * 1.25 + 0.5, 0.012));
+                if (uv.y < -0.95 || uv.y > 1.05) { c = hazard(uv, vec3f(0.75, 0.55, 0.04), 2.5); }
+                (*m).albedo = c;
             }
-            case 5u: { // dark painted metal
-                var a = vec3f(0.10, 0.11, 0.12) * (0.8 + 0.4 * hash(floor(uv * 2.0)));
-                a = a * (1.0 - 0.6 * max(seam(uv.x * 2.0, 0.01), seam(uv.y * 2.0, 0.01)));
-                m.albedo = a; m.spec = 0.45; m.shin = 30.0;
+            case 6u: { // tiles
+                (*m).albedo = base * (1.0 - a.y * max(seam(uv.x * a.x, 0.012), seam(uv.y * a.x, 0.012)));
             }
-            case 6u: { // glass
-                m.albedo = vec3f(0.004, 0.012, 0.014); m.spec = 1.2; m.shin = 110.0;
+            case 7u: { // hazard stripes
+                (*m).albedo = hazard(uv, base, a.x);
             }
-            case 7u: { // red glow panel
-                m.albedo = vec3f(0.05);
-                m.emis = vec3f(1.0, 0.07, 0.02) * (1.1 + 0.25 * sin(t * 2.3));
+            case 8u: { // bands
+                (*m).albedo = base * (1.0 - a.y * seam(uv.y * a.x, 0.03));
             }
-            case 8u: { // ceiling
-                m.albedo = vec3f(0.085, 0.09, 0.095) * (1.0 - 0.6 * max(seam(uv.x, 0.012), seam(uv.y, 0.012)));
-                m.spec = 0.2; m.shin = 16.0;
-            }
-            case 9u: { // hazard trim
-                m.albedo = hazard(uv); m.spec = 0.4; m.shin = 24.0;
-            }
-            case 10u: { // blinking status LEDs
-                let blink = step(0.35, fract(t * 0.6 + uv.x * 3.7));
-                m.albedo = vec3f(0.02);
-                m.emis = vec3f(0.15, 1.0, 0.35) * (0.3 + 1.7 * blink);
-            }
-            case 11u: { // light metal
-                m.albedo = vec3f(0.18, 0.2, 0.16); m.spec = 0.7; m.shin = 40.0;
-            }
-            case 12u: { // alarm beacon
-                m.albedo = vec3f(0.08, 0.01, 0.01);
-                m.emis = vec3f(1.0, 0.08, 0.03) * (0.12 + 3.0 * U.params.z);
-            }
-            case 13u: { // red tally LED: blinks when the instance is "selected"
-                let blink = step(0.5, fract(t * 1.5));
-                m.albedo = vec3f(0.05, 0.0, 0.0);
-                m.emis = vec3f(1.0, 0.06, 0.03) * mix(0.35, 0.2 + 3.0 * blink, sel);
-            }
-            case 14u: { // armour
-                m.albedo = vec3f(0.15, 0.19, 0.12) * (1.0 - 0.5 * seam(uv.y * 4.0, 0.03));
-                m.spec = 0.5; m.shin = 30.0;
-            }
-            case 15u: { // phone body: graphite
-                m.albedo = vec3f(0.035, 0.037, 0.042); m.spec = 0.9; m.shin = 70.0;
-                m.emis = vec3f(0.012, 0.013, 0.015);
-            }
-            case 16u: { // wood
+            case 9u: { // wood grain
                 let g = sin((uv.x + uv.y * 0.15) * 55.0 + sin(uv.y * 5.0) * 2.0) * 0.5 + 0.5;
-                m.albedo = vec3f(0.36, 0.23, 0.12) * (0.75 + 0.3 * g) * (0.9 + 0.2 * hash(floor(uv * vec2f(3.0, 1.0))));
-                m.spec = 0.25; m.shin = 20.0;
+                (*m).albedo = base * (0.75 + 0.3 * g) * (0.9 + 0.2 * hash(floor(uv * vec2f(3.0, 1.0))));
             }
             default: {}
         }
+    }
+
+    // Time-varying emission driver
+    fn signal(id : u32, d : MaterialDef, uv : vec2f) -> f32 {
+        let t = U.params.x;
+        switch id {
+            case 1u: { return sin(t * d.sig.z); }
+            case 2u: { return step(d.shade.w, fract(t * d.sig.z + uv.x * d.sig.w)); }
+            case 3u: { return U.params.z; }
+            case 4u: { return U.lights[0].pos.w; }
+            default: { return 0.0; }
+        }
+    }
+
+    fn material(id : u32, uv : vec2f, wp : vec3f, sel : f32) -> Mat {
+        let d = mats[id];
+        var m : Mat;
+        m.albedo = d.albedo.rgb;
+        m.spec = d.shade.x;
+        m.shin = d.shade.y;
+        pattern(u32(d.albedo.w + 0.5), d.albedo.rgb, d.args, uv, wp, &m);
+
+        let sid = u32(d.emis.w + 0.5);
+        var level = d.sig.x + d.sig.y * signal(sid, d, uv);
+        if (d.shade.z >= 0.0) { level = mix(d.shade.z, level, sel); }
+        var ec = d.emis.rgb;
+        if (sid == 4u) { ec = ec * U.lights[0].color.rgb; }
+        m.emis = ec * level;
         return m;
     }
 

@@ -1,21 +1,11 @@
 'use strict';
 // Mesh building and the Doom 3 GUI-surface mapping.
 
-// Material names used by scenario data -> ids understood by the scene shader's material() switch
-const MATERIALS = Object.freeze({
-    wall: 0, floorGrate: 1, copper: 2, door: 3, bulb: 4, darkMetal: 5, glass: 6, redGlow: 7, ceiling: 8,
-    hazard: 9, led: 10, lightMetal: 11, beacon: 12, tally: 13, armour: 14, phoneBody: 15, wood: 16
-});
-
-function materialId(name) {
-    const id = MATERIALS[name];
-    if (id === undefined) throw new Error(`Unknown material "${name}"`);
-    return id;
-}
-
 // Vertex layout: pos3 normal3 uv2 material1. UVs are planar and world-scaled (1 unit = 1 m).
+// Material names resolve to ids through the world MaterialTable.
 class MeshBuilder {
-    constructor() {
+    constructor(materials) {
+        this.materials = materials;
         this.data = [];
     }
 
@@ -24,7 +14,7 @@ class MeshBuilder {
     }
 
     box(x0, y0, z0, x1, y1, z1, mat) {
-        const m = materialId(mat);
+        const m = this.materials.id(mat);
         const faces = [
             [[1, 0, 0], [[x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [x1, y0, z1]]],
             [[-1, 0, 0], [[x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0]]],
@@ -41,7 +31,7 @@ class MeshBuilder {
     }
 
     cylinder(center, radius, length, axis, mat, segments = 16) {
-        const m = materialId(mat);
+        const m = this.materials.id(mat);
         const place = (u, v, along) => axis === 'x' ? [along, u, v] : axis === 'y' ? [u, along, v] : [u, v, along];
         const h = length / 2;
         for (let i = 0; i < segments; i++) {
@@ -61,7 +51,7 @@ class MeshBuilder {
 
     // The two triangles of a GUI surface; their texture coordinates define the GUI frame
     surface(tri, mat) {
-        const m = materialId(mat);
+        const m = this.materials.id(mat);
         const { xyz, st, normal, corner } = tri;
         for (const [p, uv] of [[xyz[0], st[0]], [xyz[1], st[1]], [xyz[2], st[2]], [xyz[0], st[0]], [xyz[2], st[2]], [corner, [0, 1]]]) {
             this.vertex(p, normal, uv, m);

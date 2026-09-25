@@ -67,7 +67,7 @@ class World {
         if (!this.meshes.has(name)) {
             const parts = this.scenario.models[name];
             if (!parts) throw new Error(`No model "${name}"`);
-            this.meshes.set(name, this.game.renderer.createMesh(new MeshBuilder().parts(parts)));
+            this.meshes.set(name, this.game.renderer.createMesh(new MeshBuilder(this.game.renderer.worldMaterials).parts(parts)));
         }
         return this.meshes.get(name);
     }

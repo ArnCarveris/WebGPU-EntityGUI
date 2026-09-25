@@ -32,7 +32,7 @@ GUI materials are named textures: `atlas` (fonts / images), `cctv`, `viewfinder`
 
 ```
 js/core/        math, audio
-js/render/      geometry (MeshBuilder, MATERIALS, GuiSurface), WGSL shaders, Renderer / RenderView / RenderTarget / ScenePass
+js/render/      MaterialTable, geometry (MeshBuilder, GuiSurface), WGSL shaders, Renderer / RenderView / RenderTarget / ScenePass
 js/gui/         GuiAtlas, DeviceContext + GuiModel, EntityGUI, TerminalGUI, EaselGUI, PhoneGUI, phone apps
 js/systems/     render-target systems: CctvSystem, PhoneCamera + MediaLibrary, IptvPlayer, PaintCanvas
 js/world/       entity classes (ENTITY_TYPES) and World (facility state, actions, lights, sound waves)
@@ -44,6 +44,11 @@ js/main.js      entry point
 ## Changing the scenario (`js/scenario.js`)
 
 - **Geometry / models**: `models.<name>` is a list of `box` / `cylinder` parts with material names.
+- **Materials**: `materials.<name>` gives a world material its `albedo`, `spec`, `shin`, a procedural
+  `pattern` (`flat`, `panels`, `grating`, `mottled`, `plates`, `door`, `tiles`, `hazard`, `bands`,
+  `wood`, tuned by `args`) and an optional `emissive` block driven by a `signal` (`constant`, `wave`,
+  `blink`, `alarm`, `light0`). The table is uploaded to a storage buffer that the scene shader indexes
+  with each vertex's material id (`js/render/materials.js`).
 - **Entities**: `entities` lists `{ type, id, ... }`; `type` maps to a class in `ENTITY_TYPES`
   (`static`, `door`, `lamp`, `alarmBeacon`, `light`, `drone`, `securityCamera`, `avatar`,
   `terminal`, `easel`). Add a camera, light or easel by adding an entry. Up to 6 lights; the first
