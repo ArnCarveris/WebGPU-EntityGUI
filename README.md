@@ -3,7 +3,7 @@
 Doom 3-style world-space GUIs in WebGPU: an airlock terminal with CCTV, a paint easel and a handheld
 debug phone (radar, camera, gallery, IPTV), in a small facility built entirely from data.
 
-Open `webgpu_world_space_ui_stencil_demo.html` in a WebGPU browser (Chrome/Edge 113+, or Brave with
+Open `index.html` in a WebGPU browser (Chrome/Edge 113+, or Brave with
 WebGPU enabled). It uses classic `<script>` files, so it also runs straight from disk.
 
 ## How a GUI surface works (`EntityGUI`)
