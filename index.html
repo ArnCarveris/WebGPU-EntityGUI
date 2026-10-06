@@ -31,7 +31,7 @@
             touch-action: none;
             cursor: crosshair;
         }
-        /* Only used when WebGPU is unavailable; all other UI lives in the 3D scene */
+        /* Only used when WebGPU is unavailable; all other UI lives in the 3D scene (bar the GPU picker below) */
         #fallback {
             display: none;
             position: fixed;
@@ -65,6 +65,32 @@
             max-height: 40vh;
             overflow: auto;
         }
+        /* GPU adapter picker, above the fault card too so another GPU can be tried from there */
+        .gpu-pick {
+            position: fixed;
+            top: 12px;
+            right: 12px;
+            z-index: 60;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 4px 4px 10px;
+            background: var(--panel);
+            border: 1px solid var(--line);
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 12px;
+            color: var(--muted);
+        }
+        .gpu-pick select {
+            max-width: 400px;
+            background: #0a141a;
+            color: var(--text);
+            border: 1px solid var(--line);
+            font: inherit;
+            padding: 2px 4px;
+            cursor: pointer;
+        }
+        .gpu-pick select:hover, .gpu-pick select:focus { border-color: #6edcff; outline: none; }
     </style>
 </head>
 <body>
@@ -88,6 +114,7 @@
     <script src="js/render/materials.js"></script>
     <script src="js/render/geometry.js"></script>
     <script src="js/render/shaders.js"></script>
+    <script src="js/render/gpu-choice.js"></script>
     <script src="js/render/renderer.js"></script>
     <!-- GUI: EntityGUI and its subclasses -->
     <script src="js/gui/atlas.js"></script>

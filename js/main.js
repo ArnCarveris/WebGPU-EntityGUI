@@ -7,6 +7,7 @@ function showFallback(msg) {
 }
 
 window.addEventListener('DOMContentLoaded', async () => {
+    document.body.appendChild(GpuChoice.panel());
     const game = new Game(SCENARIO, document.getElementById('view'));
     game.renderer.onError = showFallback;
     window.game = game;     // handy from the devtools console

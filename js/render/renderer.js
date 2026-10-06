@@ -51,7 +51,7 @@ class Renderer {
 
     async init() {
         if (!navigator.gpu) throw new Error('navigator.gpu is not supported in this browser.');
-        const adapter = await navigator.gpu.requestAdapter();
+        const adapter = await GpuChoice.requestAdapter();
         if (!adapter) throw new Error('Failed to find a suitable GPU adapter.');
         this.device = await adapter.requestDevice();
         // Shader/pipeline validation errors are async and otherwise only logged to the console
